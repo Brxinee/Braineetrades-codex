@@ -1,0 +1,7 @@
+[
+  {"strategy":"vwap_reversal","total_trades":0,"win_rate":0.0,"profit_factor":0.0,"sharpe_annualized":0.0,"max_drawdown":0.0,"expectancy":0.0},
+  {"strategy":"opening_range_breakout","total_trades":0,"win_rate":0.0,"profit_factor":0.0,"sharpe_annualized":0.0,"max_drawdown":0.0,"expectancy":0.0},
+  {"strategy":"supertrend_ema","total_trades":0,"win_rate":0.0,"profit_factor":0.0,"sharpe_annualized":0.0,"max_drawdown":0.0,"expectancy":0.0},
+  {"strategy":"rsi_divergence","total_trades":0,"win_rate":0.0,"profit_factor":0.0,"sharpe_annualized":0.0,"max_drawdown":0.0,"expectancy":0.0},
+  {"strategy":"gap_fade","total_trades":0,"win_rate":0.0,"profit_factor":0.0,"sharpe_annualized":0.0,"max_drawdown":0.0,"expectancy":0.0}
+]
