@@ -3,9 +3,176 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nifty 50 Intraday Research Platform</title>
+    <title>BraineeTrades — Nifty 50 Intraday Research</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.min.css" />
+    <style>
+      :root { --bg:#080808; --panel:#101010; --text:#f2f2f2; --muted:#9ea39a; --acid:#b8ff57; --border:#262626; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); font-family:"DM Sans",sans-serif; }
+      .wrap { max-width:1200px; margin:0 auto; padding:16px; }
+      h1,h2,h3 { font-family:"Barlow Condensed",sans-serif; letter-spacing:.4px; margin:0; }
+      h1 { font-size:40px; font-weight:900; }
+      .sub { color:var(--muted); margin-top:6px; }
+      .tabs { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:18px 0; }
+      .tab { border:1px solid var(--border); background:#0d0d0d; color:var(--text); padding:10px; border-radius:10px; }
+      .tab.active { border-color:var(--acid); color:var(--acid); }
+      .panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px; }
+      .hidden { display:none; }
+      .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+      .card { background:#0b0b0b; border:1px solid var(--border); border-radius:10px; padding:10px; }
+      .k { color:var(--muted); font-size:12px; }
+      .v { font-size:18px; font-weight:700; color:var(--acid); }
+      table { width:100%; border-collapse:collapse; font-size:14px; }
+      th,td { border-bottom:1px solid #222; padding:10px 6px; text-align:left; }
+      th { color:var(--muted); cursor:pointer; }
+      tr:hover { background:#121212; }
+      .drawer { position:fixed; right:0; top:0; width:min(92vw,460px); height:100vh; background:#0d0d0d; border-left:1px solid var(--border); transform:translateX(100%); transition:.22s; padding:14px; overflow:auto; z-index:20; }
+      .drawer.open { transform:translateX(0); }
+      .x { background:none; border:1px solid var(--border); color:var(--text); border-radius:8px; padding:6px 10px; float:right; }
+      .pill { display:inline-block; font-size:12px; border:1px solid var(--border); padding:4px 8px; border-radius:999px; color:var(--acid); margin-top:8px; }
+      #eqChart { margin:10px 0; }
+      @media (max-width:780px){ .tabs{grid-template-columns:repeat(2,1fr)} .cards{grid-template-columns:1fr;} h1{font-size:34px;} }
+    </style>
   </head>
   <body>
-    <noscript>This application requires JavaScript.</noscript>
+    <div class="wrap">
+      <h1>Nifty 50 Intraday Research</h1>
+      <div class="sub">Mobile-first strategy analytics + live scanning workflow.</div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="strategies">Strategies</button>
+        <button class="tab" data-tab="scanner">Live Scanner</button>
+        <button class="tab" data-tab="lab">Backtest Lab</button>
+        <button class="tab" data-tab="journal">Journal</button>
+      </div>
+
+      <section id="strategies" class="panel">
+        <div class="cards" id="metricCards"></div>
+        <div style="overflow:auto">
+          <table id="leaderboard">
+            <thead>
+              <tr>
+                <th data-sort="strategy">Strategy</th>
+                <th data-sort="total_trades">Trades</th>
+                <th data-sort="win_rate">Win %</th>
+                <th data-sort="profit_factor">PF</th>
+                <th data-sort="sharpe_annualized">Sharpe</th>
+                <th data-sort="max_drawdown">Max DD</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="scanner" class="panel hidden">Live scanner arrives in Phase 7.</section>
+      <section id="lab" class="panel hidden">Backtest lab arrives in Phase 9.</section>
+      <section id="journal" class="panel hidden">Journal arrives in Phase 10.</section>
+    </div>
+
+    <aside class="drawer" id="drawer">
+      <button class="x" id="closeDrawer">Close</button>
+      <h2 id="dTitle">Strategy</h2>
+      <div class="pill" id="dMeta"></div>
+      <div id="eqChart"></div>
+      <h3>Per-Symbol Breakdown</h3>
+      <div style="overflow:auto"><table id="symbolTable"><thead><tr><th>Symbol</th><th>Trades</th><th>Win %</th><th>Net P&L</th></tr></thead><tbody></tbody></table></div>
+      <h3 style="margin-top:12px">Last 20 Trades</h3>
+      <div style="overflow:auto"><table id="tradeTable"><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th><th>Net</th></tr></thead><tbody></tbody></table></div>
+    </aside>
+
+    <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.iife.min.js"></script>
+    <script>
+      const state = { leaderboard: [], sortKey: 'profit_factor', sortDir: 'desc' };
+      const fmt = (v,d=2)=>Number(v??0).toFixed(d);
+
+      document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
+        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); btn.classList.add('active');
+        document.querySelectorAll('section.panel').forEach(p=>p.classList.add('hidden'));
+        document.getElementById(btn.dataset.tab).classList.remove('hidden');
+      }));
+
+      async function getJson(url){
+        const r = await fetch(url, { cache:'no-store' });
+        if(!r.ok) throw new Error(`${url} failed (${r.status})`);
+        return r.json();
+      }
+
+      function renderCards(rows){
+        const totalStrategies = rows.length;
+        const avgWin = rows.reduce((a,b)=>a+(b.win_rate||0),0)/(rows.length||1);
+        const bestPF = Math.max(...rows.map(r=>r.profit_factor||0),0);
+        const lowestDD = Math.min(...rows.map(r=>r.max_drawdown??0),0);
+        document.getElementById('metricCards').innerHTML = [
+          ['Strategies', totalStrategies,0], ['Avg Win %', avgWin,2], ['Best PF', bestPF,2], ['Worst Max DD', lowestDD*100,2]
+        ].map(([k,v,d])=>`<div class="card"><div class="k">${k}</div><div class="v">${d===0?v:fmt(v,d)}${k.includes('%')?'%':''}</div></div>`).join('');
+      }
+
+      function sortedRows(){
+        return [...state.leaderboard].sort((a,b)=>{
+          const k = state.sortKey; const d = state.sortDir==='asc'?1:-1;
+          const av = a[k], bv = b[k];
+          if (typeof av === 'string') return av.localeCompare(bv)*d;
+          return ((av??0)-(bv??0))*d;
+        });
+      }
+
+      function renderTable(){
+        const tbody = document.querySelector('#leaderboard tbody');
+        tbody.innerHTML = sortedRows().map(r=>`<tr data-strategy="${r.strategy}"><td>${r.strategy}</td><td>${r.total_trades||0}</td><td>${fmt(r.win_rate)}%</td><td>${fmt(r.profit_factor)}</td><td>${fmt(r.sharpe_annualized)}</td><td>${fmt((r.max_drawdown||0)*100)}%</td></tr>`).join('');
+        tbody.querySelectorAll('tr').forEach(tr=>tr.addEventListener('click',()=>openDrawer(tr.dataset.strategy)));
+      }
+
+      document.querySelectorAll('#leaderboard th').forEach(th=>th.addEventListener('click',()=>{
+        const key = th.dataset.sort;
+        if (state.sortKey===key) state.sortDir = state.sortDir==='asc' ? 'desc' : 'asc';
+        else { state.sortKey=key; state.sortDir='desc'; }
+        renderTable();
+      }));
+
+      function renderCurve(points){
+        const el = document.getElementById('eqChart'); el.innerHTML='';
+        if(!points?.length){ el.textContent='No equity curve data.'; return; }
+        const x = points.map(p => new Date(p.timestamp).getTime()/1000);
+        const y = points.map(p => p.equity);
+        new uPlot({ width: 410, height: 220, series:[{}, {label:'Equity', stroke:'#b8ff57'}], scales:{x:{time:true}} }, [x,y], el);
+      }
+
+      function rowsFromObj(obj){ return Object.entries(obj||{}).map(([symbol,v])=>({symbol,...v})); }
+
+      async function openDrawer(strategy){
+        try {
+          const payload = await getJson(`/public/data/results/${strategy}.json`.replace('/public',''));
+          document.getElementById('dTitle').textContent = strategy.replaceAll('_',' ').toUpperCase();
+          document.getElementById('dMeta').textContent = `Generated: ${payload.generated_at || 'unknown'} | TZ: ${payload.timezone || 'Asia/Kolkata'}`;
+          renderCurve(payload.metrics?.equity_curve || []);
+
+          const symbolRows = rowsFromObj(payload.metrics?.per_symbol);
+          document.querySelector('#symbolTable tbody').innerHTML = symbolRows.map(r=>`<tr><td>${r.symbol}</td><td>${r.trades||0}</td><td>${fmt(r.win_rate)}%</td><td>${fmt(r.net_pnl)}</td></tr>`).join('') || '<tr><td colspan="4">No symbol stats.</td></tr>';
+
+          const trades = (payload.trades || []).slice(-20).reverse();
+          document.querySelector('#tradeTable tbody').innerHTML = trades.map(t=>`<tr><td>${t.timestamp||''}</td><td>${t.symbol||''}</td><td>${t.side||''}</td><td>${fmt(t.entry)}</td><td>${fmt(t.exit)}</td><td>${fmt(t.net_pnl)}</td></tr>`).join('') || '<tr><td colspan="6">No trades.</td></tr>';
+
+          document.getElementById('drawer').classList.add('open');
+        } catch (err) {
+          alert(`Failed to load strategy details: ${err.message}`);
+        }
+      }
+
+      document.getElementById('closeDrawer').addEventListener('click',()=>document.getElementById('drawer').classList.remove('open'));
+
+      async function init(){
+        try {
+          state.leaderboard = await getJson('/data/leaderboard.json');
+          renderCards(state.leaderboard); renderTable();
+        } catch(err){
+          document.getElementById('strategies').innerHTML = `<div style="color:#ff7e7e">Failed to load leaderboard: ${err.message}</div>`;
+        }
+      }
+      init();
+    </script>
   </body>
 </html>
